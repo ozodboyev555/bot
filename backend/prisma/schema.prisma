@@ -1,0 +1,206 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  phone     String?  @unique
+  firstName String?
+  lastName  String?
+  password  String?
+  role      UserRole @default(CUSTOMER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Ersag account details
+  ersagId       String?
+  ersagLogin    String?
+  ersagPassword String?
+  ersagReferral String?
+
+  // Relations
+  orders Order[]
+  cart   CartItem[]
+
+  @@map("users")
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  imageUrl    String?
+  category    String?
+  ersagId     String? // Ersag product ID
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  cartItems CartItem[]
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  userId    String
+  productId String
+  quantity  Int    @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("cart_items")
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  userId      String?
+  orderNumber String      @unique
+  status      OrderStatus @default(PENDING)
+  totalAmount Float
+  paymentMethod String?
+  paymentStatus PaymentStatus @default(PENDING)
+  
+  // Customer details
+  customerName    String?
+  customerPhone   String?
+  customerEmail   String?
+  customerAddress String?
+  customerRegion  String?
+  customerDistrict String?
+  customerNotes   String?
+  
+  // Ersag details
+  ersagOrderId    String?
+  ersagReceiptUrl String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+
+  // Relations
+  user       User?        @relation(fields: [userId], references: [id])
+  orderItems OrderItem[]
+  smsLogs    SmsLog[]
+  paymentLogs PaymentLog[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model SmsLog {
+  id        String   @id @default(cuid())
+  orderId   String?
+  phone     String
+  message   String
+  status    SmsStatus @default(PENDING)
+  response  String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  order Order? @relation(fields: [orderId], references: [id])
+
+  @@map("sms_logs")
+}
+
+model PaymentLog {
+  id            String        @id @default(cuid())
+  orderId       String
+  paymentMethod String
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  response      String?
+  createdAt     DateTime      @default(now())
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payment_logs")
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string") // string, number, boolean, json
+  isSecret  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model CaptchaSession {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  imageUrl  String?
+  iframeUrl String?
+  solution  String?
+  isSolved  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("captcha_sessions")
+}
+
+// Enums
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum SmsStatus {
+  PENDING
+  SENT
+  FAILED
+}
